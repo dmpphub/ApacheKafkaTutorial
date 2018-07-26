@@ -1,3 +1,6 @@
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.Properties;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -6,7 +9,10 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 
 public class ProducerTest {
 
+	static long st;
+	
   public static void main(String[] args) {
+	long st = System.currentTimeMillis();
     Properties props = new Properties();
     props.put("bootstrap.servers", "localhost:9092");
     props.put("acks", "all");
@@ -17,20 +23,31 @@ public class ProducerTest {
     props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
     props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
     Producer<String, String> producer = null;
-    try {
+    String sql = "";
+	JDBCConnectionManager jdbcConnectionManager = new JDBCConnectionManager();
+	PreparedStatement preparedStatement = null;
+	ResultSet resultSet = null;
+	Connection connection = null;
+	jdbcConnectionManager.getJDBCConnection();
+
+	try {
       producer = new KafkaProducer<>(props);
-      for (int i = 0; i < 100000; i++) {
-        String msg = "Message " + i;
-        producer.send(new ProducerRecord<String, String>("HelloKafkaTopic", msg));
-        System.out.println("Sent:" + msg);
+      
+      connection = jdbcConnectionManager.getConnection();
+      sql = "SELECT COL1 FROM SOURCE_TAB";
+      preparedStatement = connection.prepareStatement(sql);
+      resultSet = preparedStatement.executeQuery();
+	
+      while (resultSet.next()) {
+    	  producer.send(new ProducerRecord<String, String>("HelloKafkaTopic", String.valueOf(resultSet.getInt(1))));
       }
+      
     } catch (Exception e) {
       e.printStackTrace();
 
     } finally {
       producer.close();
+      jdbcConnectionManager.closeConnection(connection, preparedStatement, resultSet);
     }
-
   }
-
 }
